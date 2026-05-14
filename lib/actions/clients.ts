@@ -7,11 +7,40 @@ import { randomUUID } from 'crypto'
 import { clientSchema } from '@/lib/validations/client'
 import type { Client } from '@/types/database'
 
+export async function resolveAvatarUrls<T extends { avatar_url: string | null }>(
+  supabase: Awaited<ReturnType<typeof createSupabaseClient>>,
+  items: T[]
+): Promise<T[]> {
+  const withAvatars = items.filter(i => i.avatar_url)
+  if (withAvatars.length === 0) return items
+
+  const paths = withAvatars.map(i => i.avatar_url!)
+  const { data } = await supabase.storage
+    .from('client-avatars')
+    .createSignedUrls(paths, 3600)
+
+  if (!data) return items
+
+  const urlMap = new Map<string, string>()
+  data.forEach(item => {
+    if (item.signedUrl && item.path) {
+      urlMap.set(item.path, item.signedUrl)
+    }
+  })
+
+  return items.map(item => {
+    if (item.avatar_url && urlMap.has(item.avatar_url)) {
+      return { ...item, avatar_url: urlMap.get(item.avatar_url)! }
+    }
+    return item
+  })
+}
+
 export async function getAvatarUrl(storagePath: string): Promise<string | null> {
   const supabase = await createSupabaseClient()
   const { data } = await supabase.storage
     .from('client-avatars')
-    .createSignedUrl(storagePath, 3600) // 1 hour expiry
+    .createSignedUrl(storagePath, 3600)
   return data?.signedUrl ?? null
 }
 
@@ -50,7 +79,8 @@ export async function getClients(params: GetClientsParams = {}) {
 
   if (error) throw new Error(error.message)
 
-  return { data: (data || []) as Client[], count: count || 0 }
+  const clients = await resolveAvatarUrls(supabase, (data || []) as Client[])
+  return { data: clients, count: count || 0 }
 }
 
 export async function getClientById(id: string) {
@@ -70,7 +100,8 @@ export async function getClientById(id: string) {
     .eq('client_id', id)
     .order('created_at', { ascending: false })
 
-  return { client: client as Client, tasks: tasks || [] }
+  const [resolvedClient] = await resolveAvatarUrls(supabase, [client as Client])
+  return { client: resolvedClient, tasks: tasks || [] }
 }
 
 export async function deleteClient(id: string) {

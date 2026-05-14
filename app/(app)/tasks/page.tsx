@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react'
 import { getTasks } from '@/lib/actions/tasks'
 import { buttonVariants } from '@/components/ui/button'
 import { TasksTable } from '@/components/tables/tasks-table'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { cn } from '@/lib/utils'
 
 interface TasksPageProps {
   searchParams: Promise<{
@@ -68,18 +68,21 @@ function StatusTabs({ current }: { current: string }) {
   ]
 
   return (
-    <Tabs value={current}>
-      <TabsList>
-        {tabs.map((tab) => (
-          <TabsTrigger
-            key={tab.value}
-            value={tab.value}
-            render={<Link href={`/tasks?status=${tab.value}`} />}
-          >
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
+    <div className="inline-flex items-center gap-1 rounded-xl bg-muted p-1">
+      {tabs.map((tab) => (
+        <Link
+          key={tab.value}
+          href={`/tasks?status=${tab.value}`}
+          className={cn(
+            'inline-flex items-center justify-center px-4 py-1.5 text-sm font-medium rounded-lg transition-colors',
+            current === tab.value
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </div>
   )
 }
